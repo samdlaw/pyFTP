@@ -2,7 +2,7 @@
 #
 # FTP implementation using Python.
 # This is required to overcome the limitation in ftp.exe whic is available as part of Windows (cmd)
-# which does not support Passive mode or Secure FTP over SS:/TLS (STPS). This Python implementation
+# which does not support Passive mode or Secure FTP over SSL/TLS (FTPS). This Python implementation
 # can work in passive mode as well as over SSL/TLS (FTPS).
 #
 import os
@@ -507,7 +507,7 @@ class ftpProcess():
         
         self.ftpConn.auth()
 #
-# Get User ID, Password & Account for login. Sends USER to login and calls further PASS and AUTH as requested
+# Get User ID, Password & Account for login. Sends USER to login and passes further PASS and AUTH as requested by using ftpCommand 'userAuth' function
 # Called from:
 #   ftpProcessCommand
 #   ftpCommand_open
@@ -666,8 +666,7 @@ class ftpProcess():
         
         return not(outputError)
 #
-# List multiple directory from remote server to local file
-# Calls 'NLST' or 'LIST' depending on call
+# List multiple directory from remote server to local file. Calls ftpCommand 'nlist' function to get details in required format
 # Called from:
 #   ftpProcessCommand
 #
@@ -725,14 +724,14 @@ class ftpProcess():
             
             self.ftpCommand_stor(inputFil, inputFil)
 #
-# Calls 'remfiles' for processing multiple files - get only
+# Calls ftpCommand 'remfiles' for processing multiple files - get only
 # Called from:
 #   ftpProcessCommand
 #
     def ftpCommand_mget(self, dirList = ''):
         self.ftpCommand_remfiles(dirList)
 #
-# Calls 'remfiles' for processing multiple files - delete only
+# Calls ftpCommand 'remfiles' for processing multiple files - delete only
 # Called from:
 #   ftpProcessCommand
 #
@@ -904,7 +903,7 @@ class ftpProcess():
         if outputError == True:
             os.remove(localFile)
 #
-# Calls the 'stor' function to override for append
+# Calls the ftpCommand 'stor' function to override for append
 # Called from:
 #   ftpProcessCommand
 #
@@ -1059,7 +1058,7 @@ class ftpProcess():
         
         return commandStatus
 #
-# Pass the 'remotecmd' response to get the error code in number format
+# Pass the ftpCommand 'remotecmd' response to get the error code in number format
 # Called from:
 #   ftpCommand_user
 #   ftpCommand_rnfr
@@ -1123,7 +1122,7 @@ if __name__ == "__main__":
     parser.add_argument('-d', dest='debug', default=False, action='store_true', help="Enables debugging")
     parser.add_argument('-t', dest='ssltls', default=False, action='store_true', help="Enables FTP over SSL/TLS (FTPS)")
     parser.add_argument('-s', dest='ftpcommandfile', metavar='filename', help="Specifies a text file containing FTP commands; the commands will automatically run after FTP starts.")
-    parser.add_argument('host', nargs='?', help="Specified the host name or IP addess of the remote host to connect to.")
+    parser.add_argument('host', nargs='?', help="Specifies the host name or IP addess of the remote host to connect to.")
     args = parser.parse_args()
 
     if args.verbose:
