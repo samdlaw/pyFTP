@@ -132,8 +132,8 @@ class ftpProcess():
 # Main function to handle user command inputs
 #
     def ftpProcessCommand(self, userInput):
-        splitInput = userInput.strip().lower().split(' ', 1)
-        userCommand = splitInput[0]
+        splitInput = userInput.strip().split(' ', 1)
+        userCommand = splitInput[0].lower()
         userParams = ''
         if len(splitInput) > 1:
             userParams = splitInput[1]
@@ -404,7 +404,7 @@ class ftpProcess():
 #   ftpProcessCommand
 #
     def ftpCommand_help(self, helpString = ''):
-        userInputs = getInputParams(helpString)
+        userInputs = getInputParams(helpString.lower())
         if len(userInputs) == 0:
             printLine = ''
             printItem = 0
@@ -679,7 +679,7 @@ class ftpProcess():
             userInputs += getInputParams(dirList)
         
         if len(userInputs) < 2:
-            print(f'{self.ftpCommand["command"]} remote files local file.')
+            print(f'{self.ftpCommand} remote files local file.')
             return
         
         remoteFileList = userInputs[:-1]
