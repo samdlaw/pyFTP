@@ -128,6 +128,16 @@ class ftpProcess():
         self.ftpConn = None
         self.ftpTerminate = False
 #
+# Used when resetting the existing connection
+# Called from:
+#   ftpCheckCommand
+#   ftpCommand_close
+#
+    def resetconnection(self):
+        self.loginHost = ''
+        self.loginPort = 0
+        self.loginUser = ''
+#
 # Process User Input Commands
 # Main function to handle user command inputs
 #
@@ -145,6 +155,8 @@ class ftpProcess():
             print('Under development. Please contact developer for latest status.')
             return
         
+        # Gets function to be called from dictionary 'commandValid'. Prefixes the function name with 'ftpCommand_' to create the actual function name to process
+        # for the ftp command. If parameters are allowed for function, then parameters are passed for processing.
         callFnName = self.commandValid[userCommand]['func']
         callFTPFn = getattr(self, 'ftpCommand_' + callFnName)
         if self.ftpCmdList[callFnName]['args'] > 0:
@@ -176,6 +188,7 @@ class ftpProcess():
             if (len(self.loginUser) > 0 and (self.remoteLastCheck <= hostLastConnected)) or \
                         (self.ftpConnectionActive() == False):
                 print('Connection closed by remote host.')
+                self.resetconnection()
                 commandErr = True
         
         if commandErr == True:
@@ -190,11 +203,9 @@ class ftpProcess():
 #
     def ftpConnectionActive(self):
         if self.ftpCommand_remotecmd('NOOP', -1)['cmdsuccess'] == False:
-            self.loginHost = ''
-            self.loginPort = 0
-            self.loginUser = ''
             return False
         
+        self.remoteLastCheck = datetime.now()
         return True
 #
 # Toggle Debug mode
@@ -202,7 +213,7 @@ class ftpProcess():
 #   ftpProcessCommand
 #
     def ftpCommand_debug(self):
-        self.ftpCommand_usermodes()
+        self.ftpCommand_togglestatus()
 
         self.ftpCommand_ftpdebug()
 #
@@ -226,21 +237,21 @@ class ftpProcess():
 #   ftpProcessCommand
 #
     def ftpCommand_prompt(self):
-        self.ftpCommand_usermodes()
+        self.ftpCommand_togglestatus()
 #
 # Toggle Verbose mode
 # Called from:
 #   ftpProcessCommand
 #
     def ftpCommand_verbose(self):
-        self.ftpCommand_usermodes()
+        self.ftpCommand_togglestatus()
 #
 # Toggle SSL/TLS for connection
 # Called from:
 #   ftpProcessCommand
 #
     def ftpCommand_secure(self):
-        self.ftpCommand_usermodes()
+        self.ftpCommand_togglestatus()
 #
 # Toggle secure channel for data connection
 # Called from:
@@ -256,9 +267,9 @@ class ftpProcess():
         else:
             self.ftpCommand_prot_c()
         
-        self.ftpCommand_usermodes(True)
+        self.ftpCommand_togglestatus(True)
 #
-# Create Secure Data connection
+# Create Secure Data connection. Sends PROT P to remote server
 # Called from:
 #   ftpCommand_datasecure
 #   ftpCommand_user
@@ -272,7 +283,7 @@ class ftpProcess():
         if cmdResponse['cmdsuccess'] == True:
             self.systStatus['datasecure'] = True
 #
-# Clear the Secure Data connection
+# Clear the Secure Data connection. Sends PROT C to remote server
 # Called from:
 #   ftpCommand_datasecure
 #
@@ -290,7 +301,7 @@ class ftpProcess():
 #   ftpCommand_secure
 #   ftpCommand_datasecure
 #
-    def ftpCommand_usermodes(self, statusOnly = False):
+    def ftpCommand_togglestatus(self, statusOnly = False):
         statusName = self.ftpCommand
 
         if statusName not in self.systStatus.keys():
@@ -352,7 +363,7 @@ class ftpProcess():
         
         self.ftpCommand = 'passive'
         self.systStatus['passive'] = newStatus
-        self.ftpCommand_usermodes(True)
+        self.ftpCommand_togglestatus(True)
 #
 # Change Transfer Type to ascii. Overrides the function 'type'
 # Called from:
@@ -507,7 +518,7 @@ class ftpProcess():
         
         self.ftpConn.auth()
 #
-# Get User ID, Password & Account for login. Sends USER to login and passes further PASS and AUTH as requested by using ftpCommand 'userAuth' function
+# Get User ID, Password & Account for login. Sends USER to login and passes further PASS and AUTH as requested by using ftpCommand 'challengeuser' function
 # Called from:
 #   ftpProcessCommand
 #   ftpCommand_open
@@ -537,11 +548,11 @@ class ftpProcess():
         while self.ftpCommand_errorCode(cmdResponse) in range(300, 400):
             checkStatus = self.ftpCommand_errorCode(cmdResponse)
             if checkStatus == 331:
-                cmdResponse = self.ftpCommand_userAuth('PASS', loginPass)
+                cmdResponse = self.ftpCommand_challengeuser('PASS', loginPass)
                 loginPass = cmdResponse[0]
                 cmdResponse = cmdResponse[1]
             elif checkStatus == 332:
-                cmdResponse = self.ftpCommand_userAuth('ACCT', loginAcct)
+                cmdResponse = self.ftpCommand_challengeuser('ACCT', loginAcct)
                 loginAcct = cmdResponse[0]
                 cmdResponse = cmdResponse[1]
             else:
@@ -552,6 +563,7 @@ class ftpProcess():
         elif self.ftpCommand_errorCode(cmdResponse) in [230, 232]:
             self.loginUser = loginID
             self.DefaultRemoteDir = self.ftpConn.pwd()
+            self.remoteDir = self.DefaultRemoteDir
             self.remoteLastCheck = datetime.now()
             if self.systStatus['secure'] == True:
                 self.ftpCommand_prot_p()
@@ -560,7 +572,7 @@ class ftpProcess():
 # Called from:
 #   ftpCommand_user
 #
-    def ftpCommand_userAuth(self, command, userParams = '', ):
+    def ftpCommand_challengeuser(self, command, userParams = '', ):
         reqStr = ''
         if command == 'PASS':
             reqStr = f'Password:'
@@ -581,6 +593,7 @@ class ftpProcess():
 # Disconnect from remote host. Could've used QUIT and may be redundant code
 # Called from:
 #   ftpProcessCommand
+#   ftpCheckCommand
 #   ftpCommand_quit
 #
     def ftpCommand_close(self):
@@ -592,9 +605,7 @@ class ftpProcess():
         except:
             ftpResponse = self.ftpConn.close()
         finally:
-            self.loginHost = ''
-            self.loginPort = 0
-            self.loginUser = ''
+            self.resetconnection()
             if ftpResponse != None:
                 print(ftpResponse)
 #
@@ -1032,7 +1043,7 @@ class ftpProcess():
 #   ftpCommand_type
 #   ftpCommand_remotehelp   (Forced output)
 #   ftpCommand_user
-#   ftpCommand_userAuth
+#   ftpCommand_challengeuser
 #   ftpCommand_cwd
 #   ftpCommand_pwd          (Forced output)
 #   ftpCommand_cdup
